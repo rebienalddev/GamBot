@@ -16,6 +16,17 @@ const {
 const { initDb, db, getUser, claimDaily, getLeaderboard } = require('./database/database');
 const { createErrorEmbed, createDailyEmbed, createLeaderboardEmbed, createStatsEmbed } = require('./utils/embeds');
 
+const http = require('http');
+
+// Lightweight HTTP server for Render free web service healthchecks
+const PORT = process.env.PORT || 3000;
+http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('GamBot is alive and running!\n');
+}).listen(PORT, () => {
+  console.log(`[HTTP] Healthcheck server listening on port ${PORT}`);
+});
+
 // Initialize Discord Client
 const client = new Client({
   intents: [
