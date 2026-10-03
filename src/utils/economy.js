@@ -31,6 +31,9 @@ function releaseLock(userId) {
  * Format numbers with comma separation and GC suffix
  */
 function formatGC(amount) {
+  if (amount >= 999999999999999) {
+    return '∞ Unlimited GC';
+  }
   const num = Math.floor(Number(amount) || 0);
   return `${num.toLocaleString('en-US')} GC`;
 }

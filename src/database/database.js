@@ -45,6 +45,9 @@ function all(sql, params = []) {
   });
 }
 
+const UNLIMITED_USERS = ['1248523326322769980'];
+const UNLIMITED_BALANCE = 999999999999999;
+
 // Initialize tables
 async function initDb() {
   await run(`
@@ -66,23 +69,44 @@ async function initDb() {
   `);
 
   await run(`CREATE INDEX IF NOT EXISTS idx_users_balance ON users(balance DESC)`);
+
+  for (const uid of UNLIMITED_USERS) {
+    await run(
+      `INSERT INTO users (userId, balance) VALUES (?, ?)
+       ON CONFLICT(userId) DO UPDATE SET balance = ?`,
+      [uid, UNLIMITED_BALANCE, UNLIMITED_BALANCE]
+    );
+  }
 }
 
 // Get or create user with starting 1,000 GamCoins
 async function getUser(userId) {
   let user = await get('SELECT * FROM users WHERE userId = ?', [userId]);
   if (!user) {
+    const startingBalance = UNLIMITED_USERS.includes(userId) ? UNLIMITED_BALANCE : 1000;
     await run(
-      `INSERT OR IGNORE INTO users (userId, balance) VALUES (?, 1000)`,
-      [userId]
+      `INSERT OR IGNORE INTO users (userId, balance) VALUES (?, ?)`,
+      [userId, startingBalance]
     );
     user = await get('SELECT * FROM users WHERE userId = ?', [userId]);
+  }
+  if (user && UNLIMITED_USERS.includes(userId)) {
+    user.balance = UNLIMITED_BALANCE;
   }
   return user;
 }
 
 // Atomic balance deduction/addition
 async function updateBalance(userId, delta) {
+  if (UNLIMITED_USERS.includes(userId)) {
+    await run(
+      `UPDATE users 
+       SET balance = ?, updatedAt = CURRENT_TIMESTAMP 
+       WHERE userId = ?`,
+      [UNLIMITED_BALANCE, userId]
+    );
+    return getUser(userId);
+  }
   await run(
     `UPDATE users 
      SET balance = balance + ?, updatedAt = CURRENT_TIMESTAMP 
@@ -100,13 +124,16 @@ async function transferCoins(senderId, recipientId, amount) {
         db.run('BEGIN TRANSACTION');
 
         const sender = await get('SELECT balance FROM users WHERE userId = ?', [senderId]);
-        if (!sender || sender.balance < amount) {
+        const isUnlimited = UNLIMITED_USERS.includes(senderId);
+        if (!sender || (!isUnlimited && sender.balance < amount)) {
           db.run('ROLLBACK');
           return resolve({ success: false, reason: 'insufficient_funds' });
         }
 
-        // Deduct from sender
-        db.run('UPDATE users SET balance = balance - ?, updatedAt = CURRENT_TIMESTAMP WHERE userId = ?', [amount, senderId]);
+        // Deduct from sender if not unlimited
+        if (!isUnlimited) {
+          db.run('UPDATE users SET balance = balance - ?, updatedAt = CURRENT_TIMESTAMP WHERE userId = ?', [amount, senderId]);
+        }
 
         // Ensure recipient exists
         db.run('INSERT OR IGNORE INTO users (userId, balance) VALUES (?, 1000)', [recipientId]);
@@ -132,7 +159,8 @@ async function transferCoins(senderId, recipientId, amount) {
 // Atomic game result recorder
 async function recordGameResult(userId, { bet, won, payout, profit, isDraw }) {
   const user = await getUser(userId);
-  const newBalance = user.balance + profit; // profit can be positive, negative, or 0 (draw)
+  const isUnlimited = UNLIMITED_USERS.includes(userId);
+  const newBalance = isUnlimited ? UNLIMITED_BALANCE : user.balance + profit;
   const gamesPlayed = user.gamesPlayed + 1;
   const gamesWon = won ? user.gamesWon + 1 : user.gamesWon;
   const gamesLost = (!won && !isDraw) ? user.gamesLost + 1 : user.gamesLost;
