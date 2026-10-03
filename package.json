@@ -1,0 +1,27 @@
+{
+  "name": "gambot",
+  "version": "1.0.0",
+  "description": "A fun, polished Discord gambling and economy bot inspired by OWO with fictional GamCoins (GC)",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "deploy": "node src/deploy-commands.js",
+    "dev": "node --watch src/index.js"
+  },
+  "keywords": [
+    "discord-bot",
+    "gambling",
+    "economy",
+    "owo",
+    "games",
+    "discordjs",
+    "sqlite"
+  ],
+  "author": "Rebienald",
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5",
+    "sqlite3": "^5.1.7"
+  }
+}
